@@ -23,7 +23,7 @@ func formatRange(ctx context.Context, v source.View, uri protocol.DocumentURI, r
 		r.Start = tok.Pos(0)
 		r.End = tok.Pos(tok.Size())
 	} else {
-		r = fromProtocolRange(tok, *rng)
+		r = fromProtocolRange(f, *rng)
 	}
 	edits, err := source.Format(ctx, f, r)
 	if err != nil {

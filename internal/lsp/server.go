@@ -288,8 +288,7 @@ func (s *server) Completion(ctx context.Context, params *protocol.CompletionPara
 	if err != nil {
 		return nil, err
 	}
-	tok := f.GetToken()
-	pos := fromProtocolPosition(tok, params.Position)
+	pos := fromProtocolPosition(f, params.Position)
 	items, prefix, err := source.Completion(ctx, f, pos)
 	if err != nil {
 		return nil, err
@@ -314,7 +313,7 @@ func (s *server) Hover(ctx context.Context, params *protocol.TextDocumentPositio
 		return nil, err
 	}
 	tok := f.GetToken()
-	pos := fromProtocolPosition(tok, params.Position)
+	pos := fromProtocolPosition(f, params.Position)
 	ident, err := source.Identifier(ctx, s.view, f, pos)
 	if err != nil {
 		return nil, err
@@ -342,8 +341,7 @@ func (s *server) SignatureHelp(ctx context.Context, params *protocol.TextDocumen
 	if err != nil {
 		return nil, err
 	}
-	tok := f.GetToken()
-	pos := fromProtocolPosition(tok, params.Position)
+	pos := fromProtocolPosition(f, params.Position)
 	info, err := source.SignatureHelp(ctx, f, pos)
 	if err != nil {
 		return nil, err
@@ -360,8 +358,7 @@ func (s *server) Definition(ctx context.Context, params *protocol.TextDocumentPo
 	if err != nil {
 		return nil, err
 	}
-	tok := f.GetToken()
-	pos := fromProtocolPosition(tok, params.Position)
+	pos := fromProtocolPosition(f, params.Position)
 	ident, err := source.Identifier(ctx, s.view, f, pos)
 	if err != nil {
 		return nil, err
@@ -378,8 +375,7 @@ func (s *server) TypeDefinition(ctx context.Context, params *protocol.TextDocume
 	if err != nil {
 		return nil, err
 	}
-	tok := f.GetToken()
-	pos := fromProtocolPosition(tok, params.Position)
+	pos := fromProtocolPosition(f, params.Position)
 	ident, err := source.Identifier(ctx, s.view, f, pos)
 	if err != nil {
 		return nil, err

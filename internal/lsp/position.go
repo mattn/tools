@@ -5,9 +5,13 @@
 package lsp
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"go/token"
 	"net/url"
+	"os"
+	"unicode/utf8"
 
 	"golang.org/x/tools/internal/lsp/cache"
 	"golang.org/x/tools/internal/lsp/protocol"
@@ -36,8 +40,7 @@ func fromProtocolLocation(ctx context.Context, v *cache.View, loc protocol.Locat
 	if err != nil {
 		return source.Range{}, err
 	}
-	tok := f.GetToken()
-	return fromProtocolRange(tok, loc.Range), nil
+	return fromProtocolRange(f, loc.Range), nil
 }
 
 // toProtocolLocation converts from a source range back to a protocol location.
@@ -53,7 +56,7 @@ func toProtocolLocation(fset *token.FileSet, r source.Range) protocol.Location {
 // fromProtocolRange converts a protocol range to a source range.
 // It uses fromProtocolPosition to convert the start and end positions, which
 // requires the token file the positions belongs to.
-func fromProtocolRange(f *token.File, r protocol.Range) source.Range {
+func fromProtocolRange(f source.File, r protocol.Range) source.Range {
 	start := fromProtocolPosition(f, r.Start)
 	var end token.Pos
 	switch {
@@ -78,12 +81,60 @@ func toProtocolRange(f *token.File, r source.Range) protocol.Range {
 	}
 }
 
+func debugmsg(v interface{}) {
+	f, err := os.OpenFile("c:/temp/debug-go.log", os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		panic(err)
+	}
+
+	defer f.Close()
+
+	fmt.Fprintf(f, "---\n%v\n", v)
+}
+
+func columnOffset(content []byte, pos protocol.Position) int {
+	var line, char, offset int
+
+	line = int(pos.Line)
+	for len(content) > 0 {
+		if line == 0 {
+			break
+		}
+		i := bytes.IndexByte(content, '\n')
+		if i < 0 {
+			return -1
+		}
+		content = content[i+1:]
+		line--
+	}
+
+	i := bytes.IndexByte(content, '\n')
+	if i != -1 {
+		content = content[:i+1]
+	}
+
+	for len(content) > 0 {
+		char++
+		r, size := utf8.DecodeRune(content)
+		if r >= 0x10000 {
+			char++
+		}
+		if char > int(pos.Character) {
+			return offset
+		}
+		offset += size
+		content = content[size:]
+	}
+
+	return -1
+}
+
 // fromProtocolPosition converts a protocol position (0-based line and column
 // number) to a token.Pos (byte offset value).
 // It requires the token file the pos belongs to in order to do this.
-func fromProtocolPosition(f *token.File, pos protocol.Position) token.Pos {
+func fromProtocolPosition(f source.File, pos protocol.Position) token.Pos {
 	line := lineStart(f, int(pos.Line)+1)
-	return line + token.Pos(pos.Character) // TODO: this is wrong, bytes not characters
+	return line + token.Pos(columnOffset(f.GetContent(), pos)) // TODO: this is wrong, bytes not characters
 }
 
 // toProtocolPosition converts from a token pos (byte offset) to a protocol
@@ -103,25 +154,27 @@ func toProtocolPosition(f *token.File, pos token.Pos) protocol.Position {
 // fromTokenPosition converts a token.Position (1-based line and column
 // number) to a token.Pos (byte offset value).
 // It requires the token file the pos belongs to in order to do this.
-func fromTokenPosition(f *token.File, pos token.Position) token.Pos {
+func fromTokenPosition(f source.File, pos token.Position) token.Pos {
 	line := lineStart(f, pos.Line)
 	return line + token.Pos(pos.Column-1) // TODO: this is wrong, bytes not characters
 }
 
 // this functionality was borrowed from the analysisutil package
-func lineStart(f *token.File, line int) token.Pos {
+func lineStart(f source.File, line int) token.Pos {
 	// Use binary search to find the start offset of this line.
 	//
 	// TODO(rstambler): eventually replace this function with the
 	// simpler and more efficient (*go/token.File).LineStart, added
 	// in go1.12.
 
-	min := 0        // inclusive
-	max := f.Size() // exclusive
+	tok := f.GetToken()
+
+	min := 0          // inclusive
+	max := tok.Size() // exclusive
 	for {
 		offset := (min + max) / 2
-		pos := f.Pos(offset)
-		posn := f.Position(pos)
+		pos := tok.Pos(offset)
+		posn := tok.Position(pos)
 		if posn.Line == line {
 			return pos - (token.Pos(posn.Column) - 1)
 		}

@@ -471,3 +471,36 @@ func TestBytesOffset(t *testing.T) {
 		}
 	}
 }
+
+func TestColumnOffset(t *testing.T) {
+	tests := []struct {
+		text string
+		pos  protocol.Position
+		want int
+	}{
+		{text: `aあb`, pos: protocol.Position{Line: 0, Character: 0}, want: 0},
+		{text: `aあb`, pos: protocol.Position{Line: 0, Character: 1}, want: 1},
+		{text: `aあb`, pos: protocol.Position{Line: 0, Character: 2}, want: 4},
+		{text: `aあb`, pos: protocol.Position{Line: 0, Character: 3}, want: -1},
+		{text: `aあb`, pos: protocol.Position{Line: 0, Character: 4}, want: -1},
+		{text: `a𐐀b`, pos: protocol.Position{Line: 0, Character: 0}, want: 0},
+		{text: `a𐐀b`, pos: protocol.Position{Line: 0, Character: 1}, want: 1},
+		{text: `a𐐀b`, pos: protocol.Position{Line: 0, Character: 2}, want: 1},
+		{text: `a𐐀b`, pos: protocol.Position{Line: 0, Character: 3}, want: 5},
+		{text: `a𐐀b`, pos: protocol.Position{Line: 0, Character: 4}, want: -1},
+		{text: "aaa\nbbb\n", pos: protocol.Position{Line: 0, Character: 3}, want: 3},
+		{text: "aaa\nbbb\n", pos: protocol.Position{Line: 0, Character: 4}, want: -1},
+		{text: "aaa\nbbb\n", pos: protocol.Position{Line: 1, Character: 0}, want: 0},
+		{text: "aaa\nbbb\n", pos: protocol.Position{Line: 1, Character: 3}, want: 3},
+		{text: "aaa\nbbb\n", pos: protocol.Position{Line: 1, Character: 4}, want: -1},
+		{text: "aaa\nbbb\n", pos: protocol.Position{Line: 2, Character: 0}, want: -1},
+		{text: "aaa\nbbb\n\n", pos: protocol.Position{Line: 2, Character: 0}, want: 0},
+	}
+
+	for _, test := range tests {
+		got := columnOffset([]byte(test.text), test.pos)
+		if got != test.want {
+			t.Errorf("want %d for %q(Line:%d,Character:%d), but got %d", test.want, test.text, int(test.pos.Line), int(test.pos.Character), got)
+		}
+	}
+}
